@@ -19,6 +19,7 @@ import (
 
 type Event struct {
 	PID  uint32
+	UID  uint32
 	Comm [16]byte
 }
 
@@ -71,6 +72,11 @@ func main() {
 		}
 
 		comm := string(bytes.TrimRight(event.Comm[:], "\x00"))
-		fmt.Printf("[EXECVE] pid=%-6d comm=%s\n", event.PID, comm)
+
+		if comm == "cpuUsage.sh" || comm == "MainThread" || comm == "sh" {
+			continue
+		}
+
+		fmt.Printf("[EXECVE] pid=%-6d uid=%-4d comm=%s\n", event.PID, event.UID, comm)
 	}
 }

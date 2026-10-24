@@ -10,6 +10,7 @@ struct {
 
 struct event {
     __u32 pid;
+    __u32 uid;
     char comm[16];
 };
 
@@ -23,6 +24,7 @@ int trace_execve(void *ctx) {
     }
 
     e->pid = bpf_get_current_pid_tgid() >> 32;
+    e->uid = bpf_get_current_uid_gid();
     bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
     bpf_ringbuf_submit(e, 0);
