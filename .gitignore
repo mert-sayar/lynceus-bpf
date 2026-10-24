@@ -1,0 +1,5 @@
+*.o
+lynceus-bpf
+
+roadmap.md
+notes.md
