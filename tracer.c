@@ -12,10 +12,18 @@ struct event {
     __u32 pid;
     __u32 uid;
     char comm[16];
+    char filename[64];
+};
+
+struct execve_ctx {
+    __u64 unused;
+    __s32 syscall_nr;
+    __u32 pad;
+    const char *filename;
 };
 
 SEC("tracepoint/syscalls/sys_enter_execve")
-int trace_execve(void *ctx) {
+int trace_execve(struct execve_ctx *ctx) {
     struct event *e;
 
     e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
@@ -26,6 +34,9 @@ int trace_execve(void *ctx) {
     e->pid = bpf_get_current_pid_tgid() >> 32;
     e->uid = bpf_get_current_uid_gid();
     bpf_get_current_comm(&e->comm, sizeof(e->comm));
+
+    // Read the executed binary path string safely from user-space memory
+    bpf_probe_read_user_str(&e->filename, sizeof(e->filename), ctx->filename);
 
     bpf_ringbuf_submit(e, 0);
     return 0;

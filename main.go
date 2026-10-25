@@ -18,9 +18,10 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go bpf tracer.c
 
 type Event struct {
-	PID  uint32
-	UID  uint32
-	Comm [16]byte
+	PID      uint32
+	UID      uint32
+	Comm     [16]byte
+	Filename [64]byte
 }
 
 func main() {
@@ -77,6 +78,8 @@ func main() {
 			continue
 		}
 
-		fmt.Printf("[EXECVE] pid=%-6d uid=%-4d comm=%s\n", event.PID, event.UID, comm)
+		filename := string(bytes.TrimRight(event.Filename[:], "\x00"))
+
+		fmt.Printf("[EXECVE] pid=%-6d uid=%-4d comm=%-12s path=%s\n", event.PID, event.UID, comm, filename)
 	}
 }
