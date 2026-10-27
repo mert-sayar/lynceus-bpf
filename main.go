@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -25,6 +26,16 @@ type Event struct {
 }
 
 func main() {
+	policyPath := flag.String("policy", "policy.yaml", "Path to security policy file")
+	flag.Parse()
+
+	policy, err := LoadPolicy(*policyPath)
+	if err != nil {
+		log.Fatalf("failed to load policy %v", err)
+	}
+
+	log.Printf("policy loaded: %d blocked binaries, %d restricted uids", len(policy.BlockedBinaries), len(policy.RestrictedUids))
+
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatalf("failed to remove memlock limit: %v", err)
 	}
@@ -79,6 +90,11 @@ func main() {
 		}
 
 		filename := string(bytes.TrimRight(event.Filename[:], "\x00"))
+
+		if policy.IsBlocked(filename, event.UID) {
+			fmt.Printf("[BLOCKED] pid=%-6d uid=%-4d comm=%-12s path=%s\n", event.PID, event.UID, comm, filename)
+			continue
+		}
 
 		fmt.Printf("[EXECVE] pid=%-6d uid=%-4d comm=%-12s path=%s\n", event.PID, event.UID, comm, filename)
 	}
