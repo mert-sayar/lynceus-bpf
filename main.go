@@ -21,6 +21,7 @@ import (
 type Event struct {
 	PID      uint32
 	UID      uint32
+	Blocked  uint8
 	Comm     [16]byte
 	Filename [64]byte
 }
@@ -46,11 +47,27 @@ func main() {
 	}
 	defer objs.Close()
 
-	tp, err := link.Tracepoint("syscalls", "sys_enter_execve", objs.TraceExecve, nil)
-	if err != nil {
-		log.Fatalf("failed to attach tracepoint: %v", err)
+	for _, uid := range policy.RestrictedUids {
+		if err := objs.RestrictedUids.Put(uid, uint8(1)); err != nil {
+			log.Fatalf("failed to insert restricted uid %d: %v", uid, err)
+		}
 	}
-	defer tp.Close()
+
+	for _, bin := range policy.BlockedBinaries {
+		var key [64]byte
+		copy(key[:], bin)
+		if err := objs.BlockedBinaries.Put(key, uint8(1)); err != nil {
+			log.Fatalf("failed to insert blocked binary %s: %v", bin, err)
+		}
+	}
+
+	lsmLink, err := link.AttachLSM(link.LSMOptions{
+		Program: objs.RestrictExec,
+	})
+	if err != nil {
+		log.Fatalf("failed to attach LSM hook: %v", err)
+	}
+	defer lsmLink.Close()
 
 	rd, err := ringbuf.NewReader(objs.Events)
 	if err != nil {
@@ -91,7 +108,7 @@ func main() {
 
 		filename := string(bytes.TrimRight(event.Filename[:], "\x00"))
 
-		if policy.IsBlocked(filename, event.UID) {
+		if event.Blocked == 1 {
 			fmt.Printf("[BLOCKED] pid=%-6d uid=%-4d comm=%-12s path=%s\n", event.PID, event.UID, comm, filename)
 			continue
 		}

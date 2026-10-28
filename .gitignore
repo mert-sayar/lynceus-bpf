@@ -1,4 +1,5 @@
 bin/
+bpf_bpf*.go
 *.o
 lynceus-bpf
 *.yaml

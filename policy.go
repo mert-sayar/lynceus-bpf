@@ -2,8 +2,6 @@ package main
 
 import (
 	"os"
-	"path/filepath"
-	"slices"
 
 	"github.com/goccy/go-yaml"
 )
@@ -30,13 +28,4 @@ func LoadPolicy(path string) (*Policy, error) {
 	}
 
 	return &p, nil
-}
-
-func (p *Policy) IsBlocked(filename string, uid uint32) bool {
-	if !slices.Contains(p.RestrictedUids, uid) {
-		return false
-	}
-
-	baseName := filepath.Base(filename)
-	return slices.Contains(p.BlockedBinaries, baseName)
 }
