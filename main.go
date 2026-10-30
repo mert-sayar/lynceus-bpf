@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("failed to load policy %v", err)
 	}
 
-	log.Printf("policy loaded: %d blocked binaries, %d restricted uids", len(policy.BlockedBinaries), len(policy.RestrictedUids))
+	log.Printf("policy loaded: %d rules", len(policy.Rules))
 
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatalf("failed to remove memlock limit: %v", err)
@@ -47,17 +47,22 @@ func main() {
 	}
 	defer objs.Close()
 
-	for _, uid := range policy.RestrictedUids {
-		if err := objs.RestrictedUids.Put(uid, uint8(1)); err != nil {
-			log.Fatalf("failed to insert restricted uid %d: %v", uid, err)
-		}
+	resolvedRules, err := policy.Resolve()
+	if err != nil {
+		log.Fatalf("failed to resolve policy rules: %v", err)
 	}
 
-	for _, bin := range policy.BlockedBinaries {
-		var key [64]byte
-		copy(key[:], bin)
-		if err := objs.BlockedBinaries.Put(key, uint8(1)); err != nil {
-			log.Fatalf("failed to insert blocked binary %s: %v", bin, err)
+	for _, r := range resolvedRules {
+		for _, uid := range r.Uids {
+			key := bpfPolicyKey{
+				Ino: r.Ino,
+				Uid: uid,
+				Dev: r.Dev,
+			}
+			if err := objs.PolicyMap.Put(key, uint8(1)); err != nil {
+				log.Fatalf("failed to insert policy for %s (uid %d): %v", r.Binary, uid, err)
+			}
+			log.Printf("rule active: bin=%s (inode=%d, dev=%d) blocked for uid=%d", r.Binary, r.Ino, r.Dev, uid)
 		}
 	}
 
